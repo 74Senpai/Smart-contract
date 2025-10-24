@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// ---------------------------
-// Structs
-// ---------------------------
-// Thay 'address seller' bằng 'string sellerName'
 struct Product {
     string nameProduct;
     uint price;
     uint quantity;
-    string sellerName; // Tên người bán (dùng string cho trực quan)
+    string sellerName;
 }
 
 struct Order {
@@ -18,89 +14,67 @@ struct Order {
     uint quantity;
 }
 
-// ---------------------------
-// Contract quản lý Sản phẩm Đa Người bán (Multi-Seller Product Manager)
-// ---------------------------
 contract StoresManager {
     mapping(string => Product) private products;
     string[] private productNames;
-
-    // Mapping mới: Tên Người bán (string) => Danh sách Tên Sản phẩm mà họ sở hữu (Đã thay đổi từ address)
     mapping(string => string[]) private sellerProductNames;
-
-    // Lịch sử mua hàng: Tên Người mua (string) => Danh sách Đơn hàng
     mapping(string => Order[]) private userPurchases;
 
-    //Hàm tiện ích nội bộ
+    // ======================
+    // Internal Utilities
+    // ======================
     function compareStrings(
         string memory _a,
         string memory _b
     ) private pure returns (bool) {
-        return
-            keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
+        return keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
 
-    // ---------------------------
-    // Các hàm Quản lý Sản phẩm
-    // ---------------------------
-
-    // Thêm sản phẩm. Yêu cầu thêm _sellerName (tên người bán)
+    // ======================
+    // Product Management
+    // ======================
     function addProduct(
         string memory _sellerName,
         string memory _nameProduct,
         uint _price,
         uint _quantity
     ) public {
-        require(
-            bytes(_nameProduct).length > 0,
-            "Ten san pham khong duoc de trong"
-        );
-        require(
-            bytes(_sellerName).length > 0,
-            "Ten nguoi ban khong duoc de trong"
-        );
+        // --- Kiểm tra nhập liệu ---
+        require(bytes(_sellerName).length > 0, "Ten nguoi ban khong duoc de trong");
+        require(bytes(_nameProduct).length > 0, "Ten san pham khong duoc de trong");
+        require(_price > 0, "Gia san pham phai lon hon 0");
+        require(_quantity > 0, "So luong phai lon hon 0");
+        require(!compareStrings(_sellerName, _nameProduct), "Ten nguoi ban va san pham khong duoc giong nhau");
 
+        // --- Kiểm tra trùng sản phẩm ---
         Product storage prod = products[_nameProduct];
+        require(bytes(prod.nameProduct).length == 0, "San pham da ton tai");
 
-        require(
-            bytes(prod.nameProduct).length == 0,
-            "San pham da ton tai, khong the them moi. Vui long dung ham update."
-        );
-
-        products[_nameProduct] = Product(
-            _nameProduct,
-            _price,
-            _quantity,
-            _sellerName
-        );
-
+        // --- Thêm sản phẩm ---
+        products[_nameProduct] = Product(_nameProduct, _price, _quantity, _sellerName);
         productNames.push(_nameProduct);
         sellerProductNames[_sellerName].push(_nameProduct);
     }
 
-    
-    // Cập nhật giá. Yêu cầu thêm _sellerName để xác thực
     function updatePrice(
         string memory _sellerName,
         string memory _nameProduct,
         uint _newPrice
     ) public {
+        require(_newPrice > 0, "Gia moi phai lon hon 0");
+
         Product storage prod = products[_nameProduct];
-
-        require(bytes(prod.nameProduct).length != 0, "Ko tim thay san pham");
-
-        require(
-            compareStrings(prod.sellerName, _sellerName),
-            "Ko co quyen thay doi gia"
-        );
+        require(bytes(prod.nameProduct).length != 0, "Khong tim thay san pham");
+        require(compareStrings(prod.sellerName, _sellerName), "Khong co quyen thay doi gia");
 
         prod.price = _newPrice;
     }
 
-    // Lấy danh sách sản phẩm thuộc về người bán (dùng tên)
     function getProductsBySeller(
         string memory _sellerName
     ) public view returns (Product[] memory) {
+        require(bytes(_sellerName).length > 0, "Ten nguoi ban khong hop le");
+
         string[] memory names = sellerProductNames[_sellerName];
         Product[] memory sellerProducts = new Product[](names.length);
 
@@ -117,49 +91,46 @@ contract StoresManager {
         view
         returns (uint price, uint quantity, string memory sellerName)
     {
+        require(bytes(_nameProduct).length > 0, "Ten san pham khong hop le");
         Product storage prod = products[_nameProduct];
-        require(bytes(prod.nameProduct).length != 0, "Ko tim thay san pham");
+        require(bytes(prod.nameProduct).length != 0, "Khong tim thay san pham");
         return (prod.price, prod.quantity, prod.sellerName);
     }
 
     function getAllProducts() public view returns (Product[] memory) {
         Product[] memory allProducts = new Product[](productNames.length);
-
         for (uint i = 0; i < productNames.length; i++) {
-            string memory name = productNames[i];
-            allProducts[i] = products[name];
+            allProducts[i] = products[productNames[i]];
         }
         return allProducts;
     }
 
-    // Người dùng mua sản phẩm. Dùng _username cho trực quan.
+    // ======================
+    // Buying
+    // ======================
     function buyProduct(
         string memory _username,
         string memory _nameProduct,
         uint _quantity
     ) public {
+        // --- Kiểm tra dữ liệu nhập ---
+        require(bytes(_username).length > 0, "Ten nguoi mua khong duoc de trong");
+        require(bytes(_nameProduct).length > 0, "Ten san pham khong hop le");
+        require(_quantity > 0, "So luong mua phai lon hon 0");
+
         Product storage prod = products[_nameProduct];
+        require(bytes(prod.nameProduct).length != 0, "Khong tim thay san pham");
+        require(prod.quantity >= _quantity, "Khong du hang trong kho");
 
-        require(bytes(prod.nameProduct).length != 0, "Ko tim thay san pham");
-        require(prod.quantity >= _quantity, "Ton kh khong du de mua");
-
-        // Giảm số lượng tồn kho
+        // --- Cập nhật dữ liệu ---
         prod.quantity -= _quantity;
-
-        // Lưu lịch sử mua hàng với _username (string)
-        userPurchases[_username].push(
-            Order({
-                nameProduct: _nameProduct,
-                price: prod.price,
-                quantity: _quantity
-            })
-        );
+        userPurchases[_username].push(Order(_nameProduct, prod.price, _quantity));
     }
 
-    // Xem danh sách sản phẩm đã mua (dùng tên người mua)
     function getPurchaseHistory(
         string memory _username
     ) public view returns (Order[] memory) {
+        require(bytes(_username).length > 0, "Ten nguoi mua khong hop le");
         return userPurchases[_username];
     }
 }
