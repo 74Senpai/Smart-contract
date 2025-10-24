@@ -35,7 +35,7 @@ contract StoresManager {
     function compareStrings(
         string memory _a,
         string memory _b
-    ) internal pure returns (bool) {
+    ) private pure returns (bool) {
         return
             keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
@@ -50,7 +50,7 @@ contract StoresManager {
         string memory _nameProduct,
         uint _price,
         uint _quantity
-    ) external {
+    ) public {
         require(
             bytes(_nameProduct).length > 0,
             "Ten san pham khong duoc de trong"
@@ -78,12 +78,13 @@ contract StoresManager {
         sellerProductNames[_sellerName].push(_nameProduct);
     }
 
+    
     // Cập nhật giá. Yêu cầu thêm _sellerName để xác thực
     function updatePrice(
         string memory _sellerName,
         string memory _nameProduct,
         uint _newPrice
-    ) external {
+    ) public {
         Product storage prod = products[_nameProduct];
 
         require(bytes(prod.nameProduct).length != 0, "Ko tim thay san pham");
@@ -99,7 +100,7 @@ contract StoresManager {
     // Lấy danh sách sản phẩm thuộc về người bán (dùng tên)
     function getProductsBySeller(
         string memory _sellerName
-    ) external view returns (Product[] memory) {
+    ) public view returns (Product[] memory) {
         string[] memory names = sellerProductNames[_sellerName];
         Product[] memory sellerProducts = new Product[](names.length);
 
@@ -112,7 +113,7 @@ contract StoresManager {
     function getProductInfo(
         string memory _nameProduct
     )
-        external
+        public
         view
         returns (uint price, uint quantity, string memory sellerName)
     {
@@ -121,7 +122,7 @@ contract StoresManager {
         return (prod.price, prod.quantity, prod.sellerName);
     }
 
-    function getAllProducts() external view returns (Product[] memory) {
+    function getAllProducts() public view returns (Product[] memory) {
         Product[] memory allProducts = new Product[](productNames.length);
 
         for (uint i = 0; i < productNames.length; i++) {
@@ -136,7 +137,7 @@ contract StoresManager {
         string memory _username,
         string memory _nameProduct,
         uint _quantity
-    ) external {
+    ) public {
         Product storage prod = products[_nameProduct];
 
         require(bytes(prod.nameProduct).length != 0, "Ko tim thay san pham");
@@ -158,7 +159,7 @@ contract StoresManager {
     // Xem danh sách sản phẩm đã mua (dùng tên người mua)
     function getPurchaseHistory(
         string memory _username
-    ) external view returns (Order[] memory) {
+    ) public view returns (Order[] memory) {
         return userPurchases[_username];
     }
 }
